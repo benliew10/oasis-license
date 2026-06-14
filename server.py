@@ -246,7 +246,7 @@ class OasisHandler(BaseHTTPRequestHandler):
         if path in ("/", "/health"):
             self._send_json(200, {"ok": True, "service": "oasis-license", "public": public_base()})
             return
-        if path == "/tapm":
+        if path == "/tapm" or path == "/t":
             self._handle_tapm(self.headers.get("AUTH", "") or "")
             return
         if is_cfgpush_path(path):
@@ -263,7 +263,7 @@ class OasisHandler(BaseHTTPRequestHandler):
         path = self._path()
         raw = self._read_body()
         # anubis may POST to http://host:8080/ (no /tapm path) when URL is 24-char padded
-        if path in ("/tapm", "/"):
+        if path in ("/tapm", "/", "/t"):
             self._handle_tapm(raw)
             return
         if is_cfgpush_path(path):
