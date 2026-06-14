@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: oasis-license
+    runtime: python
+    plan: starter
+    buildCommand: echo "stdlib only — no pip install"
+    startCommand: python3 server.py --host 0.0.0.0
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.0"

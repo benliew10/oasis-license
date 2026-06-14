@@ -1,0 +1,6 @@
+public_url.txt
+*.pem
+__pycache__/
+*.pyc
+.DS_Store
+/tmp/
