@@ -63,8 +63,14 @@ def security_token_url() -> str:
 
 
 def parse_auth_body(raw: str) -> str:
+    raw = (raw or "").strip()
+    if not raw:
+        return ""
     params = parse_qs(raw, keep_blank_values=True)
     auth = params.get("AUTH", [""])[0].strip()
+    # anubis may send bare token via AUTH header or raw POST body (not form-encoded)
+    if not auth and "=" not in raw:
+        auth = raw
     if not auth:
         return ""
     return IOS_SUFFIX_RE.sub("", auth)
@@ -139,12 +145,15 @@ def cloudctrl_payload() -> dict:
     """MGPA / .mgpacloud cloud config — replaces Tencent cloudctrl.igamecj.com response."""
     token_url = security_token_url()
     base = public_base()
-    return {
-        "retcode": 0,
-        "retCode": 0,
-        "code": 0,
-        "status": 0,
-        "cloudCtrlVersion": "1.3.3.0",
+    switch = {"cloudctrl": 1, "mgpa": 1, "enable": 1}
+    config = {
+        "securityTokenUrl": token_url,
+        "security_token_url": token_url,
+        "remoteConfigUrl": base,
+    }
+    data = {
+        "switch": switch,
+        "config": config,
         "securityTokenUrl": token_url,
         "security_token_url": token_url,
         "mgpaCloud": {
@@ -153,14 +162,20 @@ def cloudctrl_payload() -> dict:
             "securityTokenUrl": token_url,
             "security_token_url": token_url,
         },
-        "data": {
-            "securityTokenUrl": token_url,
-            "mgpaCloud": {"securityTokenUrl": token_url, "retcode": 0},
-        },
-        "config": {
-            "securityTokenUrl": token_url,
-            "remoteConfigUrl": base,
-        },
+    }
+    return {
+        "ret": 0,
+        "retcode": 0,
+        "retCode": 0,
+        "code": 0,
+        "status": 0,
+        "cloudCtrlVersion": "1.3.3.0",
+        "securityTokenUrl": token_url,
+        "security_token_url": token_url,
+        "switch": switch,
+        "mgpaCloud": data["mgpaCloud"],
+        "data": data,
+        "config": config,
     }
 
 

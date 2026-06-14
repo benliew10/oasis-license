@@ -1,5 +1,5 @@
 #!/bin/bash
-# Full public HTTPS repack: anubis URLs + SSL patch + curl redirect dylib in anubis.
+# Full public HTTPS repack: anubis URL patch + SSL patch + token redirect dylib (main binary).
 #
 # Usage:
 #   ./repack_public_ipa.sh https://oasismod.qzz.io/tapm
@@ -38,15 +38,13 @@ python3 "$DIR/patch_anubis_mgpa.py" "$ORIG" "$TMP1" --base "$BASE" --tapm "$CC_U
 echo "=== 2) Info.plist ==="
 "$DIR/repack_cc_url.sh" "$TMP1" "$CC_URL" "$TMP2"
 
-echo "=== 3) anubis SSL patch + curl redirect dylib ==="
+echo "=== 3) anubis SSL patch + token redirect dylib (main binary only) ==="
 [[ -x "$INSERT_DYLIB" ]] || { echo "Missing insert_dylib: $INSERT_DYLIB"; exit 1; }
-"$ROOT/logger-dylib/build_redirect_dylib.sh"
 rm -rf "$STAGE" && mkdir -p "$STAGE"
 unzip -q "$TMP2" -d "$STAGE"
 
 APP="$(ls -d "$STAGE"/Payload/*.app | head -n 1)"
-ANUBIS_FW="$APP/Frameworks/anubis.framework"
-ANUBIS_BIN="$ANUBIS_FW/anubis"
+ANUBIS_BIN="$APP/Frameworks/anubis.framework/anubis"
 
 python3 <<PY
 from pathlib import Path
@@ -58,20 +56,10 @@ p = Path("$ANUBIS_BIN")
 data = bytearray(p.read_bytes())
 n = mod.patch_binary(data)
 p.write_bytes(data)
-print(f"SSL patch: {n} instruction(s)")
+print(f"SSL patch: {n} instruction(s) (context-aware)")
 PY
 
-DYLIB_NAME="anubis_redirect.dylib"
-cp "$ROOT/logger-dylib/$DYLIB_NAME" "$ANUBIS_FW/$DYLIB_NAME"
-chmod 755 "$ANUBIS_FW/$DYLIB_NAME"
-LOAD="@loader_path/$DYLIB_NAME"
-if ! otool -l "$ANUBIS_BIN" | awk '/LC_LOAD_DYLIB/{show=1} show && /name/{print; show=0}' | grep -q "$DYLIB_NAME"; then
-  "$INSERT_DYLIB" --all-yes --strip-codesig "$LOAD" "$ANUBIS_BIN" "$ANUBIS_BIN.patched"
-  mv "$ANUBIS_BIN.patched" "$ANUBIS_BIN"
-  chmod 755 "$ANUBIS_BIN"
-fi
-
-# token redirect in main binary (MGPA setSecurityTokenUrl)
+# MGPA setSecurityTokenUrl swizzle — fishhook in anubis is useless (static libcurl)
 "$ROOT/logger-dylib/build_token_redirect_dylib.sh"
 MAIN="$APP/ShadowTrackerExtra"
 cp "$ROOT/logger-dylib/oasis_token_redirect.dylib" "$APP/Frameworks/oasis_token_redirect.dylib"
@@ -100,7 +88,8 @@ host = "${BASE#https://}".encode()
 assert host in dec
 otool = subprocess.check_output(["otool","-L",app+"/ShadowTrackerExtra"], text=True)
 assert "oasis_token_redirect" in otool
-assert "anubis_redirect" in subprocess.check_output(["otool","-L",app+"/Frameworks/anubis.framework/anubis"], text=True)
+anubis_otool = subprocess.check_output(["otool","-L",app+"/Frameworks/anubis.framework/anubis"], text=True)
+assert "anubis_redirect" not in anubis_otool
 p = plistlib.loads(open(app+"/Info.plist",'rb').read())
 assert p["TAPM"]["CC_URL"] == "$CC_URL"
 print("OK:", "$CC_URL")
