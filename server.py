@@ -264,7 +264,8 @@ class OasisHandler(BaseHTTPRequestHandler):
         raw = self._read_body()
         # anubis may POST to http://host:8080/ (no /tapm path) when URL is 24-char padded
         if path in ("/tapm", "/", "/t"):
-            self._handle_tapm(raw)
+            auth_hdr = self.headers.get("AUTH", "") or self.headers.get("Auth", "")
+            self._handle_tapm(raw or auth_hdr)
             return
         if is_cfgpush_path(path):
             self._handle_cfgpush()
